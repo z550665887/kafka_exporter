@@ -567,14 +567,21 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) {
 				for _, member := range group.Members {
 					assignment, err := member.GetMemberAssignment()
 					if err != nil {
-						glog.Errorf("Cannot get GetMemberAssignment of group member %v : %v", member, err)
-						return
-					}
-					for topic, partions := range assignment.Topics {
-						for _, partition := range partions {
-							offsetFetchRequest.AddPartition(topic, partition)
+						glog.Errorf("Cannot get GetMemberAssignment of group member %v : %v, group: %v", member, err, group)
+						offsetFetchRequest = sarama.OffsetFetchRequest{ConsumerGroup: group.GroupId, Version: 1}
+						for topic, partitions := range offset {
+							for partition := range partitions {
+								offsetFetchRequest.AddPartition(topic, partition)
+							}
+						}
+					}else{
+						for topic, partions := range assignment.Topics {
+							for _, partition := range partions {
+								offsetFetchRequest.AddPartition(topic, partition)
+							}
 						}
 					}
+
 				}
 			}
 			ch <- prometheus.MustNewConstMetric(
@@ -733,7 +740,7 @@ func main() {
 	toFlagStringsVar("zookeeper.server", "Address (hosts) of zookeeper server.", "localhost:2181", &opts.uriZookeeper)
 	toFlagStringVar("kafka.labels", "Kafka cluster name", "", &opts.labels)
 	toFlagStringVar("refresh.metadata", "Metadata refresh interval", "30s", &opts.metadataRefreshInterval)
-	toFlagBoolVar("offset.show-all", "Whether show the offset/lag for all consumer group, otherwise, only show connected consumer groups", true, "true", &opts.offsetShowAll)
+	toFlagBoolVar("offset.show-all", "Whether show the offset/lag for all consumer group, otherwise, only show connected consumer groups", false, "true", &opts.offsetShowAll)
 	toFlagBoolVar("concurrent.enable", "If true, all scrapes will trigger kafka operations otherwise, they will share results. WARN: This should be disabled on large clusters", false, "false", &opts.allowConcurrent)
 	toFlagIntVar("topic.workers", "Number of topic workers", 100, "100", &opts.topicWorkers)
 	toFlagIntVar("verbosity", "Verbosity log level", 0, "0", &opts.verbosityLogLevel)
